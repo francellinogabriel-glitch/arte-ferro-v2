@@ -1,0 +1,21 @@
+{
+  "name": "arte-ferro-v2",
+  "version": "1.0.0",
+  "description": "Sistema de orçamentos Arte e Ferro (backend + frontend em Node/Express)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.3.0",
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^22.0.0",
+    "uuid": "^9.0.0"
+  }
+}
