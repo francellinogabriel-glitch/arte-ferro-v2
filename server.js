@@ -327,7 +327,7 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
       cliente_email: dadosIA.cliente?.email || req.body.cliente_email || null,
       status: 'rascunho',
       pdf_cliente: pdfPath,
-      foto_projeto: null,
+  foto_projeto: JSON.stringify(caminhosImagens), // salva array de imagens como JSON
       itens: JSON.stringify(calculo.itens),
       custo_material: calculo.custo_material,
       custo_pintura: calculo.custo_pintura,
