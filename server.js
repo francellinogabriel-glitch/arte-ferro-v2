@@ -64,8 +64,8 @@ db.exec(`
 `);
 
 function proximoNumeroOrcamento() {
-  db.prepare(UPDATE sequencias SET valor = valor + 1 WHERE chave = 'orcamento').run();
-  const row = db.prepare(SELECT valor FROM sequencias WHERE chave = 'orcamento').get();
+  db.prepare(`UPDATE sequencias SET valor = valor + 1 WHERE chave = 'orcamento'`).run();
+  const row = db.prepare(`SELECT valor FROM sequencias WHERE chave = 'orcamento'`).get();
   return row.valor;
 }
 
