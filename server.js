@@ -225,7 +225,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 const upload = multer({
   dest: path.join(__dirname, 'uploads'),
   limits: { fileSize: 50 * 1024 * 1024 }
-});
+}).fields([
+  { name: 'pdf', maxCount: 1 },
+  { name: 'imagens', maxCount: 10 } // até 30 fotos por orçamento
+]);
 
 const agoraISO = () => new Date().toISOString();
 
