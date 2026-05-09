@@ -270,8 +270,6 @@ app.post('/api/clientes', (req, res) => {
 // UPLOAD DO PDF + IA + CÁLCULO
 app.post('/api/orcamentos/upload', upload, async (req, res) => {
   try {
-    app.post('/api/orcamentos/upload', upload, async (req, res) => {
-  try {
     const arquivos = req.files || {};
 
     // PDF obrigatório
@@ -286,15 +284,6 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
     const imagensFiles = arquivos.imagens || [];
     const caminhosImagens = imagensFiles.map(f => f.path);
 
-    const buffer = fs.readFileSync(pdfPath);
-    const parsed = await pdfParse(buffer);
-    ...
-
-    // Imagens opcionais
-    const imagensFiles = arquivos.imagens || [];
-    const caminhosImagens = imagensFiles.map(f => f.path);
-
-    const pdfPath = req.file.path;
     const buffer = fs.readFileSync(pdfPath);
     const parsed = await pdfParse(buffer);
 
@@ -332,12 +321,12 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
     `).run({
       id,
       numero,
-      cliente_nome: dadosIA.cliente?.nome || req.body.cliente_nome || null,
-      cliente_telefone: dadosIA.cliente?.telefone || req.body.cliente_telefone || null,
-      cliente_email: dadosIA.cliente?.email || req.body.cliente_email || null,
+      cliente_nome: dadosIA.cliente?.nome || null,
+      cliente_telefone: dadosIA.cliente?.telefone || null,
+      cliente_email: dadosIA.cliente?.email || null,
       status: 'rascunho',
       pdf_cliente: pdfPath,
-  foto_projeto: JSON.stringify(caminhosImagens), // salva array de imagens como JSON
+      foto_projeto: JSON.stringify(caminhosImagens),
       itens: JSON.stringify(calculo.itens),
       custo_material: calculo.custo_material,
       custo_pintura: calculo.custo_pintura,
@@ -354,14 +343,14 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
       id,
       numero,
       calculo,
-      dados_ia: dadosIA
+      dados_ia: dadosIA,
+      imagens: caminhosImagens
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: err.message });
   }
 });
-
 // LISTAR ORÇAMENTOS
 app.get('/api/orcamentos', (req, res) => {
   const orcamentos = db.prepare(`
