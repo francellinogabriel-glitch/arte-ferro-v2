@@ -46,13 +46,36 @@ async function carregarOrcamentos() {
 async function enviarPDF(e) {
   e.preventDefault();
 
-  const input = document.getElementById('pdf');
+  async function enviarPDF(e) {
+  e.preventDefault();
+
+  const inputPdf = document.getElementById('pdf');
+  const inputImgs = document.getElementById('imagens');
   const resultado = document.getElementById('upload-resultado');
 
-  if (!input.files.length) {
+  if (!inputPdf.files.length) {
     alert('Selecione um PDF antes de enviar.');
     return;
   }
+
+  const formData = new FormData();
+  formData.append('pdf', inputPdf.files[0]);
+
+  // adiciona as imagens, se houver
+  if (inputImgs.files && inputImgs.files.length) {
+    for (const file of inputImgs.files) {
+      formData.append('imagens', file);
+    }
+  }
+
+  resultado.textContent = 'Enviando e processando... (pode levar alguns segundos)';
+
+  try {
+    const resp = await fetch(${apiBase}/api/orcamentos/upload, {
+      method: 'POST',
+      body: formData
+    });
+    …
 
   const formData = new FormData();
   formData.append('pdf', input.files[0]);
