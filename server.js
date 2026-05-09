@@ -272,26 +272,38 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
   try {
     const arquivos = req.files || {};
 
-    // PDF obrigatório
+    // Pega PDF (se vier)
     const pdfFile = arquivos.pdf && arquivos.pdf[0];
-    if (!pdfFile) {
-      return res.status(400).json({ erro: 'Arquivo PDF obrigatório.' });
-    }
 
-    const pdfPath = pdfFile.path;
-
-    // Imagens opcionais
+    // Pega imagens (se vierem)
     const imagensFiles = arquivos.imagens || [];
     const caminhosImagens = imagensFiles.map(f => f.path);
 
-    const buffer = fs.readFileSync(pdfPath);
-    const parsed = await pdfParse(buffer);
+    // Se não tem PDF nem imagens, não faz sentido criar orçamento
+    if (!pdfFile && caminhosImagens.length === 0) {
+      return res.status(400).json({ erro: 'Envie um PDF ou pelo menos uma imagem.' });
+    }
 
     let dadosIA;
-    try {
-      dadosIA = await extrairDadosPDF(parsed.text);
-    } catch (erroIA) {
-      console.error('Erro ao chamar IA:', erroIA);
+    let textoPdf = '';
+
+    // Se veio PDF, tenta ler e usar a IA
+    if (pdfFile) {
+      const pdfPath = pdfFile.path;
+      const buffer = fs.readFileSync(pdfPath);
+      const parsed = await pdfParse(buffer);
+      textoPdf = parsed.text || '';
+
+      try {
+        dadosIA = await extrairDadosPDF(textoPdf);
+      } catch (erroIA) {
+        console.error('Erro ao chamar IA:', erroIA);
+        dadosIA = null;
+      }
+    }
+
+    // Se não conseguiu dados da IA (sem PDF ou erro na IA), usa um padrão vazio
+    if (!dadosIA) {
       dadosIA = {
         cliente: { nome: null, telefone: null, email: null },
         itens: [],
@@ -325,7 +337,7 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
       cliente_telefone: dadosIA.cliente?.telefone || null,
       cliente_email: dadosIA.cliente?.email || null,
       status: 'rascunho',
-      pdf_cliente: pdfPath,
+      pdf_cliente: pdfFile ? pdfFile.path : null,
       foto_projeto: JSON.stringify(caminhosImagens),
       itens: JSON.stringify(calculo.itens),
       custo_material: calculo.custo_material,
@@ -344,7 +356,8 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
       numero,
       calculo,
       dados_ia: dadosIA,
-      imagens: caminhosImagens
+      imagens: caminhosImagens,
+      texto_pdf: textoPdf
     });
   } catch (err) {
     console.error(err);
