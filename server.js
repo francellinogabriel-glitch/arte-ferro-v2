@@ -270,6 +270,8 @@ app.post('/api/clientes', (req, res) => {
 // UPLOAD DO PDF + IA + CÁLCULO
 app.post('/api/orcamentos/upload', upload, async (req, res) => {
   try {
+    app.post('/api/orcamentos/upload', upload, async (req, res) => {
+  try {
     const arquivos = req.files || {};
 
     // PDF obrigatório
@@ -279,6 +281,14 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
     }
 
     const pdfPath = pdfFile.path;
+
+    // Imagens opcionais
+    const imagensFiles = arquivos.imagens || [];
+    const caminhosImagens = imagensFiles.map(f => f.path);
+
+    const buffer = fs.readFileSync(pdfPath);
+    const parsed = await pdfParse(buffer);
+    ...
 
     // Imagens opcionais
     const imagensFiles = arquivos.imagens || [];
