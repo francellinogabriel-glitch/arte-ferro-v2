@@ -268,11 +268,21 @@ app.post('/api/clientes', (req, res) => {
 });
 
 // UPLOAD DO PDF + IA + CÁLCULO
-app.post('/api/orcamentos/upload', upload.single('pdf'), async (req, res) => {
+app.post('/api/orcamentos/upload', upload, async (req, res) => {
   try {
-    if (!req.file) {
+    const arquivos = req.files || {};
+
+    // PDF obrigatório
+    const pdfFile = arquivos.pdf && arquivos.pdf[0];
+    if (!pdfFile) {
       return res.status(400).json({ erro: 'Arquivo PDF obrigatório.' });
     }
+
+    const pdfPath = pdfFile.path;
+
+    // Imagens opcionais
+    const imagensFiles = arquivos.imagens || [];
+    const caminhosImagens = imagensFiles.map(f => f.path);
 
     const pdfPath = req.file.path;
     const buffer = fs.readFileSync(pdfPath);
