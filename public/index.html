@@ -14,11 +14,16 @@
     <section class="card">
       <h2>Novo orçamento a partir de PDF</h2>
       <form id="upload-form">
-        <label>PDF do cliente:
-          <input type="file" id="pdf" name="pdf" accept="application/pdf" required />
-        </label>
-        <button type="submit">Enviar PDF e calcular</button>
-      </form>
+  <label>PDF do cliente:
+    <input type="file" id="pdf" name="pdf" accept="application/pdf" required />
+  </label>
+
+  <label>Imagens do projeto (opcional):
+    <input type="file" id="imagens" name="imagens" accept="image/*" multiple />
+  </label>
+
+  <button type="submit">Enviar e calcular</button>
+</form>
       <div id="upload-resultado"></div>
     </section>
 
