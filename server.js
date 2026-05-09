@@ -1,4 +1,3 @@
-// Carrega variáveis de ambiente (Railway e desenvolvimento local)
 require('dotenv').config();
 
 const express = require('express');
@@ -11,16 +10,10 @@ const { v4: uuid } = require('uuid');
 const Database = require('better-sqlite3');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// ───────────────────────────────────────────────
-// PASTAS BÁSICAS
-// ───────────────────────────────────────────────
 ['data', 'uploads', 'propostas', 'public'].forEach((dir) => {
   fs.mkdirSync(path.join(__dirname, dir), { recursive: true });
 });
 
-// ───────────────────────────────────────────────
-// BANCO DE DADOS (SQLite com better-sqlite3)
-// ───────────────────────────────────────────────
 const db = new Database(path.join(__dirname, 'data/sistema.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
@@ -67,19 +60,15 @@ db.exec(`
     chave TEXT PRIMARY KEY,
     valor INTEGER DEFAULT 0
   );
-  INSERT OR IGNORE INTO sequencias (chave, valor)
-  VALUES ('orcamento', 0);
+  INSERT OR IGNORE INTO sequencias (chave, valor) VALUES ('orcamento', 0);
 `);
 
 function proximoNumeroOrcamento() {
-  db.prepare(`UPDATE sequencias SET valor = valor + 1 WHERE chave = 'orcamento'`).run();
-  const row = db.prepare(`SELECT valor FROM sequencias WHERE chave = 'orcamento'`).get();
+  db.prepare(UPDATE sequencias SET valor = valor + 1 WHERE chave = 'orcamento').run();
+  const row = db.prepare(SELECT valor FROM sequencias WHERE chave = 'orcamento').get();
   return row.valor;
 }
 
-// ───────────────────────────────────────────────
-// CONFIGURAÇÃO DE CÁLCULO
-// ───────────────────────────────────────────────
 const CFG = {
   mult: parseFloat(process.env.MULTIPLICADOR_VENDA) || 2.5,
   pintBasica: parseFloat(process.env.PRECO_PINTURA_BASICA) || 100,
@@ -98,48 +87,45 @@ function custoPintura(largura_cm, altura_cm, tipo) {
   return areaM2(largura_cm, altura_cm) * base;
 }
 
-function calcularOrcamento(itens = []) {
-  let totalMat = 0;
-  let totalPint = 0;
-  let totalMO = 0;
+function calcularOrcamento(itens) {
+  var lista = itens || [];
+  var totalMat = 0;
+  var totalPint = 0;
+  var totalMO = 0;
 
-  const itensCalculados = itens.map((item) => {
-    const qtd = item.quantidade || 1;
-    const largura = item.largura_cm || 0;
-    const altura = item.altura_cm || 0;
+  var itensCalculados = lista.map(function(item) {
+    var qtd = item.quantidade || 1;
+    var largura = item.largura_cm || 0;
+    var altura = item.altura_cm || 0;
+    var matUnit = item.custo_material_unitario || 0;
+    var pintUnit = custoPintura(largura, altura, item.tipo_pintura);
+    var moUnit = item.mao_obra_unitaria || 0;
 
-    const area = areaM2(largura, altura);
-    const matUnit = item.custo_material_unitario || 0;
-    const pintUnit = custoPintura(largura, altura, item.tipo_pintura);
-    const moUnit = item.mao_obra_unitaria || 0;
-
-    const matItem = matUnit * qtd;
-    const pintItem = pintUnit * qtd;
-    const moItem = moUnit * qtd;
-
-    const custoUnit = matUnit + pintUnit + moUnit;
-    const custoTotalItem = custoUnit * qtd;
-    const vendaItem = custoTotalItem * CFG.mult;
+    var matItem = matUnit * qtd;
+    var pintItem = pintUnit * qtd;
+    var moItem = moUnit * qtd;
+    var custoUnit = matUnit + pintUnit + moUnit;
+    var custoTotalItem = custoUnit * qtd;
+    var vendaItem = custoTotalItem * CFG.mult;
 
     totalMat += matItem;
     totalPint += pintItem;
     totalMO += moItem;
 
-    return {
-      ...item,
-      area_m2: parseFloat(area.toFixed(4)),
-      custo_material_item: parseFloat(matItem.toFixed(2)),
+    return Object.assign({}, item, {
+      area_m2: parseFloat(areaM2(largura, altura).toFixed(4)),
       custo_pintura_unitario: parseFloat(pintUnit.toFixed(2)),
+      custo_material_item: parseFloat(matItem.toFixed(2)),
       custo_pintura_item: parseFloat(pintItem.toFixed(2)),
       custo_mao_obra_item: parseFloat(moItem.toFixed(2)),
       custo_unitario: parseFloat(custoUnit.toFixed(2)),
       custo_total_item: parseFloat(custoTotalItem.toFixed(2)),
       valor_venda_item: parseFloat(vendaItem.toFixed(2))
-    };
+    });
   });
 
-  const custoTotal = totalMat + totalPint + totalMO;
-  const valorVenda = custoTotal * CFG.mult;
+  var custoTotal = totalMat + totalPint + totalMO;
+  var valorVenda = custoTotal * CFG.mult;
 
   return {
     itens: itensCalculados,
@@ -155,187 +141,80 @@ function calcularOrcamento(itens = []) {
   };
 }
 
-// ───────────────────────────────────────────────
-// IA – GEMINI
-// ───────────────────────────────────────────────
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+var genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 async function extrairDadosPDF(texto) {
-  // Se não tiver chave, devolve estrutura vazia e deixa o usuário preencher
   if (!process.env.GEMINI_API_KEY) {
-    return {
-      cliente: { nome: null, telefone: null, email: null },
-      itens: [],
-      observacoes_gerais: null,
-      confianca: 'baixa'
-    };
+    return { cliente: { nome: null, telefone: null, email: null }, itens: [], observacoes_gerais: null, confianca: 'baixa' };
   }
-
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-
-  const prompt = `
-Você é especialista em orçamentos de serralheria artística.
-Analise o texto abaixo de um PDF de orçamento e retorne APENAS um JSON válido.
-
-TEXTO DO PDF:
-${texto}
-
-FORMATO EXATO:
-{
-  "cliente": {
-    "nome": "",
-    "telefone": "",
-    "email": ""
-  },
-  "itens": [{
-    "descricao": "",
-    "largura_cm": 0,
-    "altura_cm": 0,
-    "quantidade": 1,
-    "material": "",
-    "custo_material_unitario": 0,
-    "tipo_pintura": "basica",
-    "mao_obra_unitaria": 0,
-    "observacoes": null
-  }],
-  "observacoes_gerais": "",
-  "confianca": "baixa|media|alta"
-}
-`;
-
-  const result = await model.generateContent(prompt);
-  const responseText = result.response.text().trim()
-    .replace(/json\n?/g, '')
-    .replace(/\n?/g, '')
-    .trim();
-
+  var model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+  var prompt = 'Voce e especialista em orcamentos de serralheria artistica.\nAnalise o texto abaixo de um PDF de orcamento e retorne APENAS um JSON valido.\n\nTEXTO DO PDF:\n' + texto + '\n\nFORMATO EXATO:\n{\n  "cliente": { "nome": "", "telefone": "", "email": "" },\n  "itens": [{ "descricao": "", "largura_cm": 0, "altura_cm": 0, "quantidade": 1, "material": "", "custo_material_unitario": 0, "tipo_pintura": "basica", "mao_obra_unitaria": 0, "observacoes": null }],\n  "observacoes_gerais": "",\n  "confianca": "baixa|media|alta"\n}';
+  var result = await model.generateContent(prompt);
+  var responseText = result.response.text().trim().replace(/json\n?/g, '').replace(/\n?/g, '').trim();
   return JSON.parse(responseText);
 }
 
-// ───────────────────────────────────────────────
-// EXPRESS / API
-// ───────────────────────────────────────────────
-const app = express();
-
+var app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const upload = multer({
-  dest: path.join(__dirname, 'uploads'),
+var storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, path.join(__dirname, 'uploads'));
+  },
+  filename: function(req, file, cb) {
+    cb(null, uuid() + path.extname(file.originalname));
+  }
+});
+
+var upload = multer({
+  storage: storage,
   limits: { fileSize: 50 * 1024 * 1024 }
 }).fields([
   { name: 'pdf', maxCount: 1 },
-  { name: 'imagens', maxCount: 10 } // até 30 fotos por orçamento
+  { name: 'imagens', maxCount: 10 }
 ]);
 
-const agoraISO = () => new Date().toISOString();
+var agoraISO = function() { return new Date().toISOString(); };
 
-// ROTAS DE CLIENTES (bem simples)
-app.get('/api/clientes', (req, res) => {
-  const clientes = db.prepare(`
-    SELECT * FROM clientes
-    WHERE ativo = 1
-    ORDER BY nome
-  `).all();
-  res.json(clientes);
+app.get('/api/orcamentos', function(req, res) {
+  var orcamentos = db.prepare('SELECT * FROM orcamentos ORDER BY criado_em DESC').all().map(function(o) {
+    return Object.assign({}, o, { itens: JSON.parse(o.itens || '[]') });
+  });
+  res.json(orcamentos);
 });
 
-app.post('/api/clientes', (req, res) => {
-  const id = uuid();
-  const c = {
-    id,
-    nome: req.body.nome,
-    telefone: req.body.telefone || null,
-    email: req.body.email || null,
-    cpf_cnpj: req.body.cpf_cnpj || null,
-    endereco: req.body.endereco || null,
-    cidade: req.body.cidade || null,
-    tipo: req.body.tipo || 'pessoa_fisica',
-    observacoes: req.body.observacoes || null,
-    criado_em: agoraISO()
-  };
-
-  db.prepare(`
-    INSERT INTO clientes
-    (id, nome, telefone, email, cpf_cnpj, endereco, cidade, tipo, observacoes, criado_em)
-    VALUES
-    (@id, @nome, @telefone, @email, @cpf_cnpj, @endereco, @cidade, @tipo, @observacoes, @criado_em)
-  `).run(c);
-
-  res.status(201).json({ id });
-});
-
-// UPLOAD DO PDF + IA + CÁLCULO
-app.post('/api/orcamentos/upload', upload, async (req, res) => {
+app.post('/api/orcamentos/upload', upload, async function(req, res) {
   try {
-    const arquivos = req.files || {};
+    var arquivos = req.files || {};
+    var pdfFile = arquivos.pdf ? arquivos.pdf[0] : null;
+    var imagensFiles = arquivos.imagens || [];
+    var caminhosImagens = imagensFiles.map(function(f) { return f.path; });
 
-    // Pega PDF (se vier)
-    const pdfFile = arquivos.pdf && arquivos.pdf[0];
+    var dadosIA = { cliente: { nome: null, telefone: null, email: null }, itens: [], observacoes_gerais: null, confianca: 'baixa' };
 
-    // Pega imagens (se vierem)
-    const imagensFiles = arquivos.imagens || [];
-    const caminhosImagens = imagensFiles.map(f => f.path);
-
-    // Se não tem PDF nem imagens, não faz sentido criar orçamento
-    if (!pdfFile && caminhosImagens.length === 0) {
-      return res.status(400).json({ erro: 'Envie um PDF ou pelo menos uma imagem.' });
-    }
-
-    let dadosIA;
-    let textoPdf = '';
-
-    // Se veio PDF, tenta ler e usar a IA
     if (pdfFile) {
-      const pdfPath = pdfFile.path;
-      const buffer = fs.readFileSync(pdfPath);
-      const parsed = await pdfParse(buffer);
-      textoPdf = parsed.text || '';
-
       try {
-        dadosIA = await extrairDadosPDF(textoPdf);
+        var buffer = fs.readFileSync(pdfFile.path);
+        var parsed = await pdfParse(buffer);
+        dadosIA = await extrairDadosPDF(parsed.text);
       } catch (erroIA) {
-        console.error('Erro ao chamar IA:', erroIA);
-        dadosIA = null;
+        console.error('Erro ao processar PDF ou IA:', erroIA);
       }
     }
 
-    // Se não conseguiu dados da IA (sem PDF ou erro na IA), usa um padrão vazio
-    if (!dadosIA) {
-      dadosIA = {
-        cliente: { nome: null, telefone: null, email: null },
-        itens: [],
-        observacoes_gerais: null,
-        confianca: 'baixa'
-      };
-    }
+    var calculo = calcularOrcamento(dadosIA.itens || []);
+    var id = uuid();
+    var numero = proximoNumeroOrcamento();
 
-    const calculo = calcularOrcamento(dadosIA.itens || []);
-    const id = uuid();
-    const numero = proximoNumeroOrcamento();
-
-    db.prepare(`
-      INSERT INTO orcamentos (
-        id, numero, cliente_nome, cliente_telefone, cliente_email,
-        status, pdf_cliente, foto_projeto, itens,
-        custo_material, custo_pintura, custo_mao_obra, custo_total,
-        valor_venda, valor_avista, valor_parcela,
-        observacoes, criado_em
-      ) VALUES (
-        @id, @numero, @cliente_nome, @cliente_telefone, @cliente_email,
-        @status, @pdf_cliente, @foto_projeto, @itens,
-        @custo_material, @custo_pintura, @custo_mao_obra, @custo_total,
-        @valor_venda, @valor_avista, @valor_parcela,
-        @observacoes, @criado_em
-      )
-    `).run({
-      id,
-      numero,
-      cliente_nome: dadosIA.cliente?.nome || null,
-      cliente_telefone: dadosIA.cliente?.telefone || null,
-      cliente_email: dadosIA.cliente?.email || null,
+    db.prepare('INSERT INTO orcamentos (id, numero, cliente_nome, cliente_telefone, cliente_email, status, pdf_cliente, foto_projeto, itens, custo_material, custo_pintura, custo_mao_obra, custo_total, valor_venda, valor_avista, valor_parcela, observacoes, criado_em) VALUES (@id, @numero, @cliente_nome, @cliente_telefone, @cliente_email, @status, @pdf_cliente, @foto_projeto, @itens, @custo_material, @custo_pintura, @custo_mao_obra, @custo_total, @valor_venda, @valor_avista, @valor_parcela, @observacoes, @criado_em)').run({
+      id: id,
+      numero: numero,
+      cliente_nome: dadosIA.cliente ? dadosIA.cliente.nome || null : null,
+      cliente_telefone: dadosIA.cliente ? dadosIA.cliente.telefone || null : null,
+      cliente_email: dadosIA.cliente ? dadosIA.cliente.email || null : null,
       status: 'rascunho',
       pdf_cliente: pdfFile ? pdfFile.path : null,
       foto_projeto: JSON.stringify(caminhosImagens),
@@ -351,38 +230,18 @@ app.post('/api/orcamentos/upload', upload, async (req, res) => {
       criado_em: agoraISO()
     });
 
-    res.status(201).json({
-      id,
-      numero,
-      calculo,
-      dados_ia: dadosIA,
-      imagens: caminhosImagens,
-      texto_pdf: textoPdf
-    });
+    res.status(201).json({ id: id, numero: numero, calculo: calculo, dados_ia: dadosIA, imagens: caminhosImagens });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: err.message });
   }
 });
-// LISTAR ORÇAMENTOS
-app.get('/api/orcamentos', (req, res) => {
-  const orcamentos = db.prepare(`
-    SELECT * FROM orcamentos
-    ORDER BY criado_em DESC
-  `).all().map((o) => ({
-    ...o,
-    itens: JSON.parse(o.itens || '[]')
-  }));
 
-  res.json(orcamentos);
-});
-
-// FRONTEND – qualquer rota cai no index.html
-app.get('*', (req, res) => {
+app.get('*', function(req, res) {
   res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Arte e Ferro v2 rodando na porta ${PORT}`);
+var PORT = process.env.PORT || 3000;
+app.listen(PORT, function() {
+  console.log('Arte e Ferro v2 rodando na porta ' + PORT);
 });
