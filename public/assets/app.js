@@ -53,10 +53,10 @@ async function enviarPDF(e) {
   const inputImgs = document.getElementById('imagens');
   const resultado = document.getElementById('upload-resultado');
 
-  if (!inputPdf.files.length) {
-    alert('Selecione um PDF antes de enviar.');
-    return;
-  }
+  if (!inputPdf.files.length && (!inputImgs.files || !inputImgs.files.length)) {
+  alert('Envie um PDF ou pelo menos uma imagem.');
+  return;
+}
 
   const formData = new FormData();
   formData.append('pdf', inputPdf.files[0]);
