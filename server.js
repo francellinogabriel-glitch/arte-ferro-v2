@@ -359,5 +359,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(✅ Arte e Ferro v2 rodando na porta ${PORT});
+  console.log(`Arte e Ferro v2 rodando na porta ${PORT`});
 });
